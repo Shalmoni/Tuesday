@@ -6,7 +6,39 @@
       "id": "item-0561f558-9787-4553-a7b8-d26fc9a5b8e0",
       "title": "TestSave1",
       "columns": {},
-      "children": [],
+      "children": [
+        {
+          "id": "item-9ac91206-168a-4737-bd85-d27845f14590",
+          "title": "New sub-item",
+          "columns": {},
+          "children": [
+            {
+              "id": "item-333b3e39-5ec6-472d-8b29-94d90d5ad0bc",
+              "title": "New sub-item",
+              "columns": {},
+              "children": [
+                {
+                  "id": "item-f300386d-55e4-4c3b-a23d-67b34b5453e3",
+                  "title": "New sub-item",
+                  "columns": {},
+                  "children": [
+                    {
+                      "id": "item-1422ed77-ee4f-433d-ba97-3e168a6924ac",
+                      "title": "New sub-item",
+                      "columns": {},
+                      "children": [],
+                      "collapsed": false
+                    }
+                  ],
+                  "collapsed": false
+                }
+              ],
+              "collapsed": false
+            }
+          ],
+          "collapsed": false
+        }
+      ],
       "collapsed": false
     }
   ]
