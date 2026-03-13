@@ -34,9 +34,8 @@ const collectItemIds = (items: BoardItem[]): Set<string> =>
 export default function App() {
   const [board, setBoard] = useState<BoardData>(() => loadBoardData() ?? initialBoardData);
   const [githubConfig, setGitHubConfig] = useState<GitHubConfig>(() => loadGitHubConfig());
-  const [githubPanelOpen, setGitHubPanelOpen] = useState(false);
   const [githubStatusMessage, setGitHubStatusMessage] = useState(
-    'Configure GitHub settings to save or load a board file from your repo.',
+    `GitHub sync is ready for ${loadGitHubConfig().owner}/${loadGitHubConfig().repo}/data/board.json.`,
   );
   const [isSyncingGitHub, setIsSyncingGitHub] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -220,21 +219,61 @@ export default function App() {
     }));
   };
 
-  const handleGitHubConfigChange = (
-    field: 'owner' | 'repo' | 'branch' | 'path' | 'token',
-    value: string,
-  ) => {
+  const handleSetGitHubToken = () => {
+    const nextToken = window.prompt(
+      'Enter a fine-grained GitHub token with Contents read/write access for this repo.',
+      githubConfig.token,
+    );
+
+    if (nextToken === null) {
+      return;
+    }
+
+    const trimmedToken = nextToken.trim();
+
     setGitHubConfig((currentConfig) => ({
       ...currentConfig,
-      [field]: value,
+      token: trimmedToken,
     }));
+
+    setGitHubStatusMessage(
+      trimmedToken
+        ? `GitHub token saved locally for ${githubConfig.owner}/${githubConfig.repo}.`
+        : 'GitHub token cleared from this browser.',
+    );
+  };
+
+  const ensureGitHubToken = () => {
+    if (githubConfig.token) {
+      return githubConfig.token;
+    }
+
+    const nextToken = window.prompt(
+      'Enter a fine-grained GitHub token with Contents read/write access for this repo.',
+    );
+
+    const trimmedToken = nextToken?.trim() ?? '';
+    if (!trimmedToken) {
+      throw new Error('GitHub token is required before saving or loading.');
+    }
+
+    setGitHubConfig((currentConfig) => ({
+      ...currentConfig,
+      token: trimmedToken,
+    }));
+
+    return trimmedToken;
   };
 
   const handleSaveToGitHub = async () => {
     try {
       setIsSyncingGitHub(true);
       setGitHubStatusMessage('Saving board to GitHub...');
-      await saveBoardToGitHub(board, githubConfig);
+      const token = ensureGitHubToken();
+      await saveBoardToGitHub(board, {
+        ...githubConfig,
+        token,
+      });
       setGitHubStatusMessage(
         `Saved to GitHub: ${githubConfig.owner}/${githubConfig.repo}/${githubConfig.path}`,
       );
@@ -251,7 +290,11 @@ export default function App() {
     try {
       setIsSyncingGitHub(true);
       setGitHubStatusMessage('Loading board from GitHub...');
-      const remoteBoard = await loadBoardFromGitHub(githubConfig);
+      const token = ensureGitHubToken();
+      const remoteBoard = await loadBoardFromGitHub({
+        ...githubConfig,
+        token,
+      });
       setBoard(remoteBoard);
       setSelectedItemIds(new Set());
       setGitHubStatusMessage(
@@ -271,12 +314,11 @@ export default function App() {
       <BoardToolbar
         onSaveToGitHub={handleSaveToGitHub}
         onLoadFromGitHub={handleLoadFromGitHub}
-        githubPanelOpen={githubPanelOpen}
-        onToggleGitHubPanel={() => setGitHubPanelOpen((currentValue) => !currentValue)}
-        githubConfig={githubConfig}
-        onGitHubConfigChange={handleGitHubConfigChange}
+        onSetGitHubToken={handleSetGitHubToken}
         githubStatusMessage={githubStatusMessage}
         githubBusy={isSyncingGitHub}
+        repoLabel={`${githubConfig.owner}/${githubConfig.repo}`}
+        hasGitHubToken={Boolean(githubConfig.token)}
       />
 
       <BoardTable
