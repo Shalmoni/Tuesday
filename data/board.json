@@ -1,100 +1,36 @@
 {
   "title": "Tuesday",
-  "columns": [],
+  "columns": [
+    {
+      "id": "column-c6f7b038-e209-4fe6-892e-5b600d32e61f",
+      "name": "כ",
+      "type": "status",
+      "statusOptions": [
+        {
+          "id": "status-3af8e75f-d6f7-4384-86a3-38c2096777ca",
+          "label": "Not started",
+          "color": "#c4c9d4"
+        },
+        {
+          "id": "status-40d3d6b8-c834-420a-bb81-18a4012485a6",
+          "label": "Working on it",
+          "color": "#fdab3d"
+        },
+        {
+          "id": "status-8e04d069-7d99-4b14-9266-1c9b8f4849ca",
+          "label": "Done",
+          "color": "#00c875"
+        }
+      ],
+      "width": 220
+    }
+  ],
   "groups": [
     {
       "id": "group-imported",
       "name": "Tuesday",
-      "items": [
-        {
-          "id": "item-0561f558-9787-4553-a7b8-d26fc9a5b8e0",
-          "title": "Mordechai",
-          "columns": {},
-          "childColumns": [],
-          "children": [
-            {
-              "id": "item-9ac91206-168a-4737-bd85-d27845f14590",
-              "title": "New sub-item",
-              "columns": {},
-              "childColumns": [],
-              "children": [
-                {
-                  "id": "item-333b3e39-5ec6-472d-8b29-94d90d5ad0bc",
-                  "title": "New sub-item",
-                  "columns": {},
-                  "childColumns": [],
-                  "children": [
-                    {
-                      "id": "item-f300386d-55e4-4c3b-a23d-67b34b5453e3",
-                      "title": "New sub-item",
-                      "columns": {},
-                      "childColumns": [],
-                      "children": [
-                        {
-                          "id": "item-1422ed77-ee4f-433d-ba97-3e168a6924ac",
-                          "title": "New sub-item",
-                          "columns": {},
-                          "childColumns": [],
-                          "children": [
-                            {
-                              "id": "item-734897fd-4477-4054-82ef-4855e667b94b",
-                              "title": "New sub-item",
-                              "columns": {},
-                              "childColumns": [],
-                              "children": [
-                                {
-                                  "id": "item-fcbc3354-a661-4f48-a37d-29655cbec894",
-                                  "title": "New sub-item",
-                                  "columns": {},
-                                  "childColumns": [],
-                                  "children": [
-                                    {
-                                      "id": "item-1fd046e7-4130-4ba8-ac50-760284e18124",
-                                      "title": "New sub-item",
-                                      "columns": {},
-                                      "childColumns": [],
-                                      "children": [
-                                        {
-                                          "id": "item-f6ae67be-6141-44af-bd33-13b367d6bca1",
-                                          "title": "New sub-item",
-                                          "columns": {},
-                                          "childColumns": [],
-                                          "children": [],
-                                          "collapsed": false
-                                        }
-                                      ],
-                                      "collapsed": false
-                                    }
-                                  ],
-                                  "collapsed": false
-                                }
-                              ],
-                              "collapsed": true
-                            }
-                          ],
-                          "collapsed": false
-                        },
-                        {
-                          "id": "item-8ba36fc3-673e-408f-8f13-eb05f274f652",
-                          "title": "New sub-item",
-                          "columns": {},
-                          "childColumns": [],
-                          "children": [],
-                          "collapsed": false
-                        }
-                      ],
-                      "collapsed": false
-                    }
-                  ],
-                  "collapsed": false
-                }
-              ],
-              "collapsed": false
-            }
-          ],
-          "collapsed": true
-        }
-      ]
+      "color": "#579bfc",
+      "items": []
     }
   ]
 }
