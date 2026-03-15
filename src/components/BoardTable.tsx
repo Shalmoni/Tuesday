@@ -94,9 +94,13 @@ export function BoardTable({
   };
 
   const clampedItemWidth = Math.max(itemColumnWidth, ITEM_COL_MIN);
-  const templateColumns = `56px ${clampedItemWidth}px ${columns
-    .map((column) => `${getColumnWidth(column)}px`)
-    .join(' ')} 56px`;
+  const dataCols = columns.map((column) => `${getColumnWidth(column)}px`);
+  // Last data column (or the add-column cell) stretches to fill remaining space.
+  const stretchedDataCols =
+    dataCols.length > 0
+      ? [...dataCols.slice(0, -1), `minmax(${dataCols[dataCols.length - 1]}, 1fr)`]
+      : dataCols;
+  const templateColumns = `56px ${clampedItemWidth}px ${stretchedDataCols.join(' ')} minmax(56px, auto)`;
   const groupStyle = {
     '--group-accent': groupColor,
   } as CSSProperties & Record<'--group-accent', string>;

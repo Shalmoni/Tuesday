@@ -29,8 +29,15 @@ interface BoardRowsProps {
 
 const ITEM_COL_MIN = 160;
 
-const getTemplateColumns = (columns: ColumnDefinition[], itemColWidth = 320) =>
-  `56px ${Math.max(itemColWidth, ITEM_COL_MIN)}px ${columns.map((column) => `${getColumnWidth(column)}px`).join(' ')} 56px`;
+const getTemplateColumns = (columns: ColumnDefinition[], itemColWidth = 320) => {
+  const clampedItem = Math.max(itemColWidth, ITEM_COL_MIN);
+  const dataCols = columns.map((column) => `${getColumnWidth(column)}px`);
+  const stretchedDataCols =
+    dataCols.length > 0
+      ? [...dataCols.slice(0, -1), `minmax(${dataCols[dataCols.length - 1]}, 1fr)`]
+      : dataCols;
+  return `56px ${clampedItem}px ${stretchedDataCols.join(' ')} minmax(56px, auto)`;
+};
 
 const collectLeafStatusCounts = (
   items: BoardItem[],

@@ -498,6 +498,7 @@ button {
 .board-table {
   display: grid;
   min-width: 860px;
+  width: 100%;
   border-top: 1px solid #e0e6f2;
   position: relative;
 }
