@@ -611,21 +611,35 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: fit-content;
-  max-width: min(100%, 100%);
+  flex: 1 1 auto;
+  min-width: 0;
   position: sticky;
   left: 56px;
   z-index: 7;
   padding-right: 4px;
   background: #ffffff;
+  overflow: hidden;
 }
 
 .item-row-actions {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-left: 4px;
+  margin-left: auto;
   flex-shrink: 0;
+  padding-right: 6px;
+  position: sticky;
+  right: 0;
+  z-index: 7;
+  background: #ffffff;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.board-cell.item-cell:hover .item-row-actions,
+.item-row-actions:focus-within,
+.item-row-actions:has(.comment-trigger-button.has-comments) {
+  opacity: 1;
 }
 
 .expand-button {
