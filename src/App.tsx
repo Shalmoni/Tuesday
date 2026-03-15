@@ -198,6 +198,26 @@ export default function App() {
     }));
   };
 
+  const handleResizeItemColumn = (groupId: string, width: number) => {
+    setBoard((currentBoard) => ({
+      ...currentBoard,
+      groups: updateGroupById(currentBoard.groups, groupId, (group) => ({
+        ...group,
+        itemColumnWidth: Math.max(width, 160),
+      })),
+    }));
+  };
+
+  const handleUpdateItemComments = (groupId: string, itemId: string, comments: import('./types').Comment[]) => {
+    setBoard((currentBoard) => ({
+      ...currentBoard,
+      groups: updateGroupById(currentBoard.groups, groupId, (group) => ({
+        ...group,
+        items: updateItemById(group.items, itemId, (item) => ({ ...item, comments })),
+      })),
+    }));
+  };
+
   const handleAddTopLevelItem = (groupId: string) => {
     setBoard((currentBoard) => ({
       ...currentBoard,
@@ -821,6 +841,7 @@ export default function App() {
           groupColor={group.color}
           items={group.items}
           columns={groupColumns}
+          itemColumnWidth={group.itemColumnWidth ?? 320}
           selectedItemIds={selectedItemIds}
           onGroupNameChange={(nextName) => handleRenameGroup(group.id, nextName)}
           onGroupColorChange={(nextColor) => handleChangeGroupColor(group.id, nextColor)}
@@ -830,6 +851,7 @@ export default function App() {
           onEditStatusColumn={handleOpenStatusEditor}
           onDeleteColumn={handleDeleteColumn}
           onResizeColumn={(columnId, width) => handleResizeColumn(group.id, columnId, width)}
+          onResizeItemColumn={(width) => handleResizeItemColumn(group.id, width)}
           onAddChildColumn={handleAddChildColumn}
           onRenameChildColumn={handleRenameChildColumn}
           onEditChildStatusColumn={handleOpenChildStatusEditor}
@@ -842,6 +864,9 @@ export default function App() {
           onDeleteItem={(itemId) => handleDeleteItem(group.id, itemId)}
           onUpdateColumnValue={(itemId, columnId, value) =>
             handleUpdateColumnValue(group.id, itemId, columnId, value)
+          }
+          onUpdateItemComments={(itemId, comments) =>
+            handleUpdateItemComments(group.id, itemId, comments)
           }
         />
           );

@@ -136,6 +136,13 @@ const normalizeItem = (
     childColumns,
     children,
     collapsed: typeof value.collapsed === 'boolean' ? value.collapsed : false,
+    comments: Array.isArray(value.comments)
+      ? value.comments.flatMap((c) =>
+          isRecord(c) && typeof c.id === 'string' && typeof c.text === 'string' && typeof c.createdAt === 'string'
+            ? [{ id: c.id, text: c.text, createdAt: c.createdAt }]
+            : [],
+        )
+      : [],
   };
 };
 
@@ -158,6 +165,10 @@ const normalizeGroup = (
     name: typeof value.name === 'string' ? value.name : 'New group',
     color: normalizeColor(value.color, '#579bfc'),
     items,
+    itemColumnWidth:
+      typeof value.itemColumnWidth === 'number' && Number.isFinite(value.itemColumnWidth)
+        ? Math.max(value.itemColumnWidth, 160)
+        : 320,
   };
 };
 

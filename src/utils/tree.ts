@@ -16,6 +16,7 @@ export const createEmptyGroup = (
   name,
   color,
   items: [],
+  itemColumnWidth: 320,
 });
 
 export const createEmptyItem = (

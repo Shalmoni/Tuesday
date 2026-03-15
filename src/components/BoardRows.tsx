@@ -1,5 +1,5 @@
 import { CSSProperties, Fragment, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import type { BoardItem, ColumnDefinition, ListColumnEntry } from '../types';
+import type { BoardItem, ColumnDefinition, Comment, ListColumnEntry } from '../types';
 import { getColumnWidth } from '../utils/columns';
 import { getContrastTextColor } from '../utils/statusOptions';
 import {
@@ -19,6 +19,7 @@ interface BoardRowsProps {
   onAddSubItem: (parentId: string) => void;
   onDeleteItem: (itemId: string) => void;
   onUpdateColumnValue: (itemId: string, columnId: string, value: string) => void;
+  onUpdateItemComments: (itemId: string, comments: Comment[]) => void;
   onAddChildColumn: (itemId: string) => void;
   onResizeColumn: (columnId: string, width: number) => void;
   onRenameChildColumn: (itemId: string, columnId: string) => void;
@@ -26,8 +27,10 @@ interface BoardRowsProps {
   onDeleteChildColumn: (itemId: string, columnId: string) => void;
 }
 
-const getTemplateColumns = (columns: ColumnDefinition[]) =>
-  `56px minmax(320px, 1.8fr) ${columns.map((column) => `${getColumnWidth(column)}px`).join(' ')} 56px`;
+const ITEM_COL_MIN = 160;
+
+const getTemplateColumns = (columns: ColumnDefinition[], itemColWidth = 320) =>
+  `56px ${Math.max(itemColWidth, ITEM_COL_MIN)}px ${columns.map((column) => `${getColumnWidth(column)}px`).join(' ')} 56px`;
 
 const collectLeafStatusCounts = (
   items: BoardItem[],
@@ -195,6 +198,112 @@ const renderColumnInput = (
   );
 };
 
+function createCommentId() {
+  return `comment-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+interface CommentsPanelProps {
+  item: BoardItem;
+  onClose: () => void;
+  onUpdateComments: (comments: Comment[]) => void;
+}
+
+function CommentsPanel({ item, onClose, onUpdateComments }: CommentsPanelProps) {
+  const [draft, setDraft] = useState('');
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleDown = (event: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleDown);
+    return () => document.removeEventListener('mousedown', handleDown);
+  }, [onClose]);
+
+  const comments = item.comments ?? [];
+
+  const handleAdd = () => {
+    const text = draft.trim();
+    if (!text) return;
+    const next: Comment = {
+      id: createCommentId(),
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    onUpdateComments([...comments, next]);
+    setDraft('');
+  };
+
+  const handleDelete = (id: string) => {
+    onUpdateComments(comments.filter((c) => c.id !== id));
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleAdd();
+    }
+    if (event.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  return (
+    <div className="comments-panel" ref={panelRef} role="dialog" aria-label={`Comments for ${item.title}`}>
+      <div className="comments-panel-header">
+        <span className="comments-panel-title">Comments</span>
+        <button type="button" className="comments-panel-close" onClick={onClose} aria-label="Close comments">
+          ✕
+        </button>
+      </div>
+      <div className="comments-list">
+        {comments.length === 0 ? (
+          <p className="comments-empty">No comments yet.</p>
+        ) : (
+          comments.map((comment) => (
+            <div key={comment.id} className="comment-item">
+              <p className="comment-text">{comment.text}</p>
+              <div className="comment-meta">
+                <span className="comment-date">
+                  {new Date(comment.createdAt).toLocaleString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                <button
+                  type="button"
+                  className="comment-delete"
+                  onClick={() => handleDelete(comment.id)}
+                  aria-label="Delete comment"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="comments-input-row">
+        <textarea
+          className="comments-textarea"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Add a comment… (Enter to post)"
+          rows={2}
+        />
+        <button type="button" className="comments-post-button" onClick={handleAdd} aria-label="Post comment">
+          Post
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function NestedItemsTable({
   parentItem,
   selectedItemIds,
@@ -204,6 +313,7 @@ function NestedItemsTable({
   onAddSubItem,
   onDeleteItem,
   onUpdateColumnValue,
+  onUpdateItemComments,
   onAddChildColumn,
   onResizeColumn,
   onRenameChildColumn,
@@ -336,6 +446,7 @@ function NestedItemsTable({
           onAddSubItem={onAddSubItem}
           onDeleteItem={onDeleteItem}
           onUpdateColumnValue={onUpdateColumnValue}
+          onUpdateItemComments={onUpdateItemComments}
           onAddChildColumn={onAddChildColumn}
           onResizeColumn={onResizeColumn}
           onRenameChildColumn={onRenameChildColumn}
@@ -366,12 +477,15 @@ export function BoardRows({
   onAddSubItem,
   onDeleteItem,
   onUpdateColumnValue,
+  onUpdateItemComments,
   onAddChildColumn,
   onResizeColumn,
   onRenameChildColumn,
   onEditChildStatusColumn,
   onDeleteChildColumn,
 }: BoardRowsProps) {
+  const [openCommentItemId, setOpenCommentItemId] = useState<string | null>(null);
+
   const handleEnterKey = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.currentTarget.blur();
@@ -383,6 +497,8 @@ export function BoardRows({
       {items.map((item) => {
         const hasChildren = item.children.length > 0;
         const isExpanded = !item.collapsed;
+        const commentCount = item.comments?.length ?? 0;
+        const isCommentsOpen = openCommentItemId === item.id;
 
         return (
           <Fragment key={item.id}>
@@ -420,7 +536,10 @@ export function BoardRows({
                   onKeyDown={handleEnterKey}
                   placeholder="Item title"
                 />
+              </div>
 
+              {/* Item action buttons sit outside the sticky area, after the name */}
+              <div className="item-row-actions">
                 <button
                   type="button"
                   className="subitem-inline-button"
@@ -429,6 +548,32 @@ export function BoardRows({
                 >
                   +
                 </button>
+                <div className="comment-trigger-wrap">
+                  <button
+                    type="button"
+                    className={`comment-trigger-button${commentCount > 0 ? ' has-comments' : ''}`}
+                    onClick={() => setOpenCommentItemId(isCommentsOpen ? null : item.id)}
+                    aria-label={`Comments for ${item.title}`}
+                    title="Comments"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path
+                        d="M10 2C5.58 2 2 5.36 2 9.5c0 2.1.9 4 2.35 5.37L4 18l3.27-1.6A8.4 8.4 0 0 0 10 17c4.42 0 8-3.36 8-7.5S14.42 2 10 2Z"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        fill="none"
+                      />
+                    </svg>
+                    {commentCount > 0 ? <span className="comment-count-badge">{commentCount}</span> : null}
+                  </button>
+                  {isCommentsOpen ? (
+                    <CommentsPanel
+                      item={item}
+                      onClose={() => setOpenCommentItemId(null)}
+                      onUpdateComments={(comments) => onUpdateItemComments(item.id, comments)}
+                    />
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -451,6 +596,7 @@ export function BoardRows({
                   onAddSubItem={onAddSubItem}
                   onDeleteItem={onDeleteItem}
                   onUpdateColumnValue={onUpdateColumnValue}
+                  onUpdateItemComments={onUpdateItemComments}
                   onAddChildColumn={onAddChildColumn}
                   onResizeColumn={onResizeColumn}
                   onRenameChildColumn={onRenameChildColumn}

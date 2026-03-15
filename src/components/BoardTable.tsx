@@ -1,13 +1,16 @@
 import { CSSProperties, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import type { BoardItem, ColumnDefinition } from '../types';
+import type { BoardItem, ColumnDefinition, Comment } from '../types';
 import { BoardRows } from './BoardRows';
 import { getColumnWidth } from '../utils/columns';
+
+const ITEM_COL_MIN = 160;
 
 interface BoardTableProps {
   groupName: string;
   groupColor: string;
   items: BoardItem[];
   columns: ColumnDefinition[];
+  itemColumnWidth: number;
   selectedItemIds: Set<string>;
   onGroupNameChange: (value: string) => void;
   onGroupColorChange: (value: string) => void;
@@ -17,6 +20,7 @@ interface BoardTableProps {
   onEditStatusColumn: (columnId: string) => void;
   onDeleteColumn: (columnId: string) => void;
   onResizeColumn: (columnId: string, width: number) => void;
+  onResizeItemColumn: (width: number) => void;
   onAddChildColumn: (itemId: string) => void;
   onRenameChildColumn: (itemId: string, columnId: string) => void;
   onEditChildStatusColumn: (itemId: string, columnId: string) => void;
@@ -28,6 +32,7 @@ interface BoardTableProps {
   onAddSubItem: (parentId: string) => void;
   onDeleteItem: (itemId: string) => void;
   onUpdateColumnValue: (itemId: string, columnId: string, value: string) => void;
+  onUpdateItemComments: (itemId: string, comments: Comment[]) => void;
 }
 
 export function BoardTable({
@@ -35,6 +40,7 @@ export function BoardTable({
   groupColor,
   items,
   columns,
+  itemColumnWidth,
   selectedItemIds,
   onGroupNameChange,
   onGroupColorChange,
@@ -44,6 +50,7 @@ export function BoardTable({
   onEditStatusColumn,
   onDeleteColumn,
   onResizeColumn,
+  onResizeItemColumn,
   onAddChildColumn,
   onRenameChildColumn,
   onEditChildStatusColumn,
@@ -55,6 +62,7 @@ export function BoardTable({
   onAddSubItem,
   onDeleteItem,
   onUpdateColumnValue,
+  onUpdateItemComments,
 }: BoardTableProps) {
   const [openColumnMenuId, setOpenColumnMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -84,7 +92,9 @@ export function BoardTable({
       event.currentTarget.blur();
     }
   };
-  const templateColumns = `56px minmax(320px, 1.8fr) ${columns
+
+  const clampedItemWidth = Math.max(itemColumnWidth, ITEM_COL_MIN);
+  const templateColumns = `56px ${clampedItemWidth}px ${columns
     .map((column) => `${getColumnWidth(column)}px`)
     .join(' ')} 56px`;
   const groupStyle = {
@@ -125,7 +135,31 @@ export function BoardTable({
       <div className="board-scroll-area">
       <div className="board-table" style={{ gridTemplateColumns: templateColumns }}>
         <div className="board-header-cell selector-header" />
-        <div className="board-header-cell item-header-cell">Item</div>
+        <div className="board-header-cell item-header-cell">
+          Item
+          <button
+            type="button"
+            className="column-resize-handle"
+            aria-label="Resize item column"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              const startX = event.clientX;
+              const startWidth = clampedItemWidth;
+
+              const handleMouseMove = (moveEvent: MouseEvent) => {
+                onResizeItemColumn(startWidth + moveEvent.clientX - startX);
+              };
+
+              const handleMouseUp = () => {
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('mouseup', handleMouseUp);
+              };
+
+              window.addEventListener('mousemove', handleMouseMove);
+              window.addEventListener('mouseup', handleMouseUp);
+            }}
+          />
+        </div>
         {columns.map((column) => (
           <div
             key={column.id}
@@ -223,6 +257,7 @@ export function BoardTable({
           onAddSubItem={onAddSubItem}
           onDeleteItem={onDeleteItem}
           onUpdateColumnValue={onUpdateColumnValue}
+          onUpdateItemComments={onUpdateItemComments}
           onAddChildColumn={onAddChildColumn}
           onResizeColumn={onResizeColumn}
           onRenameChildColumn={onRenameChildColumn}

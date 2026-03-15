@@ -20,6 +20,12 @@ export interface ColumnDefinition {
   width?: number;
 }
 
+export interface Comment {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface BoardItem {
   id: string;
   title: string;
@@ -27,6 +33,7 @@ export interface BoardItem {
   childColumns: ColumnDefinition[];
   children: BoardItem[];
   collapsed?: boolean;
+  comments?: Comment[];
 }
 
 export interface BoardGroup {
@@ -34,6 +41,7 @@ export interface BoardGroup {
   name: string;
   color: string;
   items: BoardItem[];
+  itemColumnWidth?: number;
 }
 
 export interface BoardData {
