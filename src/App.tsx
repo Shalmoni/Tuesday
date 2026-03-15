@@ -14,7 +14,7 @@ import type {
   GitHubConfig,
   StatusOption,
 } from './types';
-import { loadBoardFromGitHub, saveBoardToGitHub } from './utils/github';
+import { getPagesWorkflowRunForCommit, loadBoardFromGitHub, saveBoardToGitHub } from './utils/github';
 import { loadBoardData, loadGitHubConfig, saveBoardData, saveGitHubConfig } from './utils/storage';
 import {
   addChildToItem,
@@ -61,6 +61,8 @@ type StatusEditorTarget =
 
 type GitHubStatusTone = 'neutral' | 'pending' | 'success' | 'error';
 
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
 const findItemAcrossGroups = (groups: BoardGroup[], itemId: string): BoardItem | null => {
   for (const group of groups) {
     const match = findItemById(group.items, itemId);
@@ -81,6 +83,7 @@ export default function App() {
   const [board, setBoard] = useState<BoardData>(() => loadBoardData() ?? initialBoardData);
   const [githubConfig, setGitHubConfig] = useState<GitHubConfig>(() => loadGitHubConfig());
   const [githubStatusMessage, setGitHubStatusMessage] = useState('');
+  const [githubStatusLabel, setGitHubStatusLabel] = useState('Info');
   const [githubStatusTone, setGitHubStatusTone] = useState<GitHubStatusTone>('neutral');
   const [isSyncingGitHub, setIsSyncingGitHub] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -462,6 +465,7 @@ export default function App() {
         ? `GitHub token saved locally for ${githubConfig.owner}/${githubConfig.repo}.`
         : 'GitHub token cleared from this browser.',
     );
+    setGitHubStatusLabel('Info');
     setGitHubStatusTone('neutral');
   };
 
@@ -481,9 +485,10 @@ export default function App() {
   const runSaveToGitHub = async (token: string) => {
     try {
       setIsSyncingGitHub(true);
+      setGitHubStatusLabel('Saving');
       setGitHubStatusTone('pending');
       setGitHubStatusMessage('Saving board to GitHub...');
-      await saveBoardToGitHub(board, {
+      const { commitSha } = await saveBoardToGitHub(board, {
         ...githubConfig,
         token,
       });
@@ -491,11 +496,68 @@ export default function App() {
         hour: 'numeric',
         minute: '2-digit',
       });
-      setGitHubStatusTone('success');
       setGitHubStatusMessage(
-        `Saved to ${githubConfig.owner}/${githubConfig.repo}/${githubConfig.path} at ${savedAt}. The repo file is updated, but GitHub Pages or the GitHub website can take a bit to catch up.`,
+        `Saved to ${githubConfig.owner}/${githubConfig.repo}/${githubConfig.path} at ${savedAt}. Waiting for the GitHub Pages action to start...`,
       );
+
+      try {
+        for (let attempt = 0; attempt < 24; attempt += 1) {
+          const workflowRun = await getPagesWorkflowRunForCommit(
+            {
+              ...githubConfig,
+              token,
+            },
+            commitSha,
+          );
+
+          if (!workflowRun) {
+            await wait(5000);
+            continue;
+          }
+
+          if (workflowRun.status !== 'completed') {
+            setGitHubStatusLabel('Deploying');
+            setGitHubStatusTone('pending');
+            setGitHubStatusMessage(
+              'GitHub Pages action is running. The site will update when the workflow finishes.',
+            );
+            await wait(5000);
+            continue;
+          }
+
+          if (workflowRun.conclusion === 'success') {
+            setGitHubStatusLabel('Deployed');
+            setGitHubStatusTone('success');
+            setGitHubStatusMessage(
+              'GitHub Pages finished successfully. The saved board is now deployed.',
+            );
+            return;
+          }
+
+          setGitHubStatusLabel('Error');
+          setGitHubStatusTone('error');
+          setGitHubStatusMessage(
+            `The GitHub Pages action finished with "${workflowRun.conclusion ?? 'unknown'}".`,
+          );
+          return;
+        }
+
+        setGitHubStatusLabel('Saved');
+        setGitHubStatusTone('success');
+        setGitHubStatusMessage(
+          'Saved to the repo, but the app could not confirm the Pages deployment yet. GitHub may still be processing the workflow.',
+        );
+      } catch (error) {
+        setGitHubStatusLabel('Saved');
+        setGitHubStatusTone('success');
+        setGitHubStatusMessage(
+          error instanceof Error
+            ? `Saved to the repo, but the deploy status could not be checked: ${error.message}`
+            : 'Saved to the repo, but the deploy status could not be checked.',
+        );
+      }
     } catch (error) {
+      setGitHubStatusLabel('Error');
       setGitHubStatusTone('error');
       setGitHubStatusMessage(
         error instanceof Error ? error.message : 'GitHub save failed for an unknown reason.',
@@ -508,6 +570,7 @@ export default function App() {
   const runLoadFromGitHub = async (token: string) => {
     try {
       setIsSyncingGitHub(true);
+      setGitHubStatusLabel('Loading');
       setGitHubStatusTone('pending');
       setGitHubStatusMessage('Loading board from GitHub...');
       const remoteBoard = await loadBoardFromGitHub({
@@ -516,11 +579,13 @@ export default function App() {
       });
       setBoard(remoteBoard);
       setSelectedItemIds(new Set());
+      setGitHubStatusLabel('Loaded');
       setGitHubStatusTone('success');
       setGitHubStatusMessage(
         `Loaded from GitHub: ${githubConfig.owner}/${githubConfig.repo}/${githubConfig.path}`,
       );
     } catch (error) {
+      setGitHubStatusLabel('Error');
       setGitHubStatusTone('error');
       setGitHubStatusMessage(
         error instanceof Error ? error.message : 'GitHub load failed for an unknown reason.',
@@ -535,6 +600,7 @@ export default function App() {
     if (!token) {
       setPendingGitHubAction('save');
       setTokenModalOpen(true);
+      setGitHubStatusLabel('Info');
       setGitHubStatusTone('neutral');
       setGitHubStatusMessage('GitHub token is required before saving.');
       return;
@@ -548,6 +614,7 @@ export default function App() {
     if (!token) {
       setPendingGitHubAction('load');
       setTokenModalOpen(true);
+      setGitHubStatusLabel('Info');
       setGitHubStatusTone('neutral');
       setGitHubStatusMessage('GitHub token is required before loading.');
       return;
@@ -596,6 +663,7 @@ export default function App() {
         onLoadFromGitHub={handleLoadFromGitHub}
         onSetGitHubToken={handleSetGitHubToken}
         githubStatusMessage={githubStatusMessage}
+        githubStatusLabel={githubStatusLabel}
         githubStatusTone={githubStatusTone}
         githubBusy={isSyncingGitHub}
         hasGitHubToken={Boolean(githubConfig.token)}

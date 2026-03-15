@@ -7,6 +7,25 @@ interface GitHubFileResponse {
   encoding: string;
 }
 
+interface GitHubSaveResponse {
+  commit?: {
+    sha?: string;
+  };
+}
+
+interface GitHubWorkflowRun {
+  id: number;
+  name: string;
+  path?: string;
+  status: string;
+  conclusion: string | null;
+  html_url: string;
+}
+
+interface GitHubWorkflowRunsResponse {
+  workflow_runs: GitHubWorkflowRun[];
+}
+
 const encodeBase64 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
@@ -103,4 +122,41 @@ export const saveBoardToGitHub = async (board: BoardData, config: GitHubConfig) 
   if (!response.ok) {
     throw new Error(`GitHub save failed: ${response.status} ${response.statusText}`);
   }
+
+  const result = (await response.json()) as GitHubSaveResponse;
+  const commitSha = result.commit?.sha;
+  if (!commitSha) {
+    throw new Error('GitHub save succeeded, but the commit SHA was not returned.');
+  }
+
+  return {
+    commitSha,
+  };
+};
+
+export const getPagesWorkflowRunForCommit = async (
+  config: GitHubConfig,
+  commitSha: string,
+): Promise<GitHubWorkflowRun | null> => {
+  ensureValidConfig(config);
+
+  const response = await fetch(
+    `https://api.github.com/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repo)}/actions/runs?head_sha=${encodeURIComponent(commitSha)}&event=push&per_page=20`,
+    {
+      headers: createHeaders(config.token),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`GitHub Actions check failed: ${response.status} ${response.statusText}`);
+  }
+
+  const result = (await response.json()) as GitHubWorkflowRunsResponse;
+  return (
+    result.workflow_runs.find(
+      (workflowRun) =>
+        workflowRun.path === '.github/workflows/deploy-pages.yml' ||
+        workflowRun.name === 'Deploy to GitHub Pages',
+    ) ?? null
+  );
 };

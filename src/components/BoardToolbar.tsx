@@ -5,6 +5,7 @@ interface BoardToolbarProps {
   onLoadFromGitHub: () => void;
   onSetGitHubToken: () => void;
   githubStatusMessage: string;
+  githubStatusLabel: string;
   githubStatusTone: 'neutral' | 'pending' | 'success' | 'error';
   githubBusy: boolean;
   hasGitHubToken: boolean;
@@ -15,6 +16,7 @@ export function BoardToolbar({
   onLoadFromGitHub,
   onSetGitHubToken,
   githubStatusMessage,
+  githubStatusLabel,
   githubStatusTone,
   githubBusy,
   hasGitHubToken,
@@ -110,9 +112,7 @@ export function BoardToolbar({
 
         {githubStatusMessage ? (
           <div className={`github-status-row github-status-${githubStatusTone}`}>
-            <span className="github-status-pill">
-              {githubBusy ? 'Saving...' : githubStatusTone === 'success' ? 'Saved' : githubStatusTone === 'error' ? 'Error' : 'Info'}
-            </span>
+            <span className="github-status-pill">{githubStatusLabel}</span>
             <p className="github-status-message">{githubStatusMessage}</p>
           </div>
         ) : null}
