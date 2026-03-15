@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 
 interface BoardToolbarProps {
+  boardTitle: string;
+  onBoardTitleChange: (value: string) => void;
   onSaveToGitHub: () => void;
   onLoadFromGitHub: () => void;
   onSetGitHubToken: () => void;
@@ -12,6 +14,8 @@ interface BoardToolbarProps {
 }
 
 export function BoardToolbar({
+  boardTitle,
+  onBoardTitleChange,
   onSaveToGitHub,
   onLoadFromGitHub,
   onSetGitHubToken,
@@ -23,6 +27,11 @@ export function BoardToolbar({
 }: BoardToolbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const handleEnterKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
+    }
+  };
 
   useEffect(() => {
     if (!menuOpen) {
@@ -40,8 +49,18 @@ export function BoardToolbar({
   }, [menuOpen]);
 
   return (
-    <section className="toolbar">
-      <h1>Tuesday: Tree Manager</h1>
+    <>
+      <img className="page-corner-logo" src="./tree-logo.png" alt="" aria-hidden="true" />
+      <section className="toolbar">
+        <div className="toolbar-title-shell">
+        <input
+          className="toolbar-title-input"
+          value={boardTitle}
+          onChange={(event) => onBoardTitleChange(event.target.value)}
+          onKeyDown={handleEnterKey}
+          aria-label="Board title"
+        />
+      </div>
 
       <div className="toolbar-actions-shell">
         <div className="toolbar-actions">
@@ -116,7 +135,8 @@ export function BoardToolbar({
             <p className="github-status-message">{githubStatusMessage}</p>
           </div>
         ) : null}
-      </div>
-    </section>
+        </div>
+      </section>
+    </>
   );
 }

@@ -1,6 +1,12 @@
 import { CSSProperties, Fragment, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import type { BoardItem, ColumnDefinition } from '../types';
+import type { BoardItem, ColumnDefinition, ListColumnEntry } from '../types';
+import { getColumnWidth } from '../utils/columns';
 import { getContrastTextColor } from '../utils/statusOptions';
+import {
+  createEmptyListEntry,
+  parseListColumnValue,
+  serializeListColumnValue,
+} from '../utils/listColumn';
 
 interface BoardRowsProps {
   items: BoardItem[];
@@ -14,13 +20,35 @@ interface BoardRowsProps {
   onDeleteItem: (itemId: string) => void;
   onUpdateColumnValue: (itemId: string, columnId: string, value: string) => void;
   onAddChildColumn: (itemId: string) => void;
+  onResizeColumn: (columnId: string, width: number) => void;
   onRenameChildColumn: (itemId: string, columnId: string) => void;
   onEditChildStatusColumn: (itemId: string, columnId: string) => void;
   onDeleteChildColumn: (itemId: string, columnId: string) => void;
 }
 
 const getTemplateColumns = (columns: ColumnDefinition[]) =>
-  `56px minmax(320px, 1.8fr) ${columns.map(() => 'minmax(180px, 1fr)').join(' ')} 56px`;
+  `56px minmax(320px, 1.8fr) ${columns.map((column) => `${getColumnWidth(column)}px`).join(' ')} 56px`;
+
+const collectLeafStatusCounts = (
+  items: BoardItem[],
+  columnId: string,
+  statusOptionIds: Set<string>,
+): Record<string, number> =>
+  items.reduce<Record<string, number>>((counts, item) => {
+    if (item.children.length === 0) {
+      const value = item.columns[columnId];
+      if (value && statusOptionIds.has(value)) {
+        counts[value] = (counts[value] ?? 0) + 1;
+      }
+      return counts;
+    }
+
+    const nestedCounts = collectLeafStatusCounts(item.children, columnId, statusOptionIds);
+    for (const [statusId, count] of Object.entries(nestedCounts)) {
+      counts[statusId] = (counts[statusId] ?? 0) + count;
+    }
+    return counts;
+  }, {});
 
 const renderColumnInput = (
   item: BoardItem,
@@ -29,8 +57,51 @@ const renderColumnInput = (
   onEnterKey: (event: KeyboardEvent<HTMLInputElement>) => void,
 ) => {
   if (column.type === 'status') {
+    if (item.children.length > 0) {
+      const statusOptionIds = new Set(column.statusOptions.map((statusOption) => statusOption.id));
+      const counts = collectLeafStatusCounts(item.children, column.id, statusOptionIds);
+      const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+
+      if (total === 0) {
+        return <div className="status-rollup-empty" />;
+      }
+
+      return (
+        <div
+          className="status-rollup-bar"
+          title={column.statusOptions
+            .filter((statusOption) => counts[statusOption.id] > 0)
+            .map(
+              (statusOption) =>
+                `${statusOption.label}: ${Math.round((counts[statusOption.id] / total) * 100)}%`,
+            )
+            .join(' | ')}
+        >
+          {column.statusOptions
+            .filter((statusOption) => counts[statusOption.id] > 0)
+            .map((statusOption) => {
+              const percentage = Math.round((counts[statusOption.id] / total) * 100);
+              return (
+                <div
+                  key={statusOption.id}
+                  className="status-rollup-segment"
+                  style={{
+                    width: `${(counts[statusOption.id] / total) * 100}%`,
+                    backgroundColor: statusOption.color,
+                    color: getContrastTextColor(statusOption.color),
+                  }}
+                >
+                  {percentage >= 10 ? `${percentage}%` : ''}
+                </div>
+              );
+            })}
+        </div>
+      );
+    }
+
     const selectedStatus =
       column.statusOptions.find((statusOption) => statusOption.id === (item.columns[column.id] ?? '')) ??
+      column.statusOptions[0] ??
       null;
     const selectStyle = selectedStatus
       ? ({
@@ -44,18 +115,72 @@ const renderColumnInput = (
     return (
       <select
         className={selectedStatus ? 'cell-input status-select status-filled' : 'cell-input status-select'}
-        value={item.columns[column.id] ?? ''}
+        value={item.columns[column.id] ?? selectedStatus?.id ?? ''}
         onChange={(event) => onUpdateColumnValue(item.id, column.id, event.target.value)}
         aria-label={column.name}
         style={selectStyle}
       >
-        <option value="">Select status</option>
         {column.statusOptions.map((statusOption) => (
           <option key={statusOption.id} value={statusOption.id}>
             {statusOption.label}
           </option>
         ))}
       </select>
+    );
+  }
+
+  if (column.type === 'list') {
+    const parsedEntries = parseListColumnValue(item.columns[column.id] ?? '');
+    const entries = parsedEntries.length > 0 ? parsedEntries : [createEmptyListEntry()];
+    const updateEntries = (nextEntries: ListColumnEntry[]) => {
+      onUpdateColumnValue(item.id, column.id, serializeListColumnValue(nextEntries));
+    };
+
+    return (
+      <div className="list-column-editor">
+        <div className="list-column-scroll">
+          {entries.map((entry) => (
+            <div key={entry.id} className="list-column-row">
+              <input
+                className="cell-input list-column-input"
+                value={entry.left}
+                onChange={(event) =>
+                  updateEntries(
+                    entries.map((currentEntry) =>
+                      currentEntry.id === entry.id
+                        ? { ...currentEntry, left: event.target.value }
+                        : currentEntry,
+                    ),
+                  )
+                }
+                onKeyDown={onEnterKey}
+              />
+              <input
+                className="cell-input list-column-input"
+                value={entry.right}
+                onChange={(event) =>
+                  updateEntries(
+                    entries.map((currentEntry) =>
+                      currentEntry.id === entry.id
+                        ? { ...currentEntry, right: event.target.value }
+                        : currentEntry,
+                    ),
+                  )
+                }
+                onKeyDown={onEnterKey}
+              />
+            </div>
+          ))}
+          <button
+            type="button"
+            className="list-column-add-row"
+            onClick={() => updateEntries([...entries, createEmptyListEntry()])}
+            aria-label={`Add row to ${column.name}`}
+          >
+            +
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -80,12 +205,14 @@ function NestedItemsTable({
   onDeleteItem,
   onUpdateColumnValue,
   onAddChildColumn,
+  onResizeColumn,
   onRenameChildColumn,
   onEditChildStatusColumn,
   onDeleteChildColumn,
 }: Omit<BoardRowsProps, 'items' | 'columns' | 'depth'> & { parentItem: BoardItem }) {
   const [openColumnMenuId, setOpenColumnMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const suppressCloseRef = useRef(false);
   const templateColumns = getTemplateColumns(parentItem.childColumns);
 
   useEffect(() => {
@@ -94,6 +221,10 @@ function NestedItemsTable({
     }
 
     const handlePointerDown = (event: MouseEvent) => {
+      if (suppressCloseRef.current) {
+        suppressCloseRef.current = false;
+        return;
+      }
       if (!menuRef.current?.contains(event.target as Node)) {
         setOpenColumnMenuId(null);
       }
@@ -107,32 +238,33 @@ function NestedItemsTable({
     <div className="subitems-shell">
       <div className="board-table nested-board-table" style={{ gridTemplateColumns: templateColumns }}>
         <div className="board-header-cell selector-header" />
-        <div className="board-header-cell">Subitem</div>
+        <div className="board-header-cell item-header-cell">Subitem</div>
         {parentItem.childColumns.map((column) => (
           <div
             key={column.id}
-            className="board-header-cell column-header-cell"
+            className={`board-header-cell column-header-cell${openColumnMenuId === column.id ? ' menu-open' : ''}`}
             ref={openColumnMenuId === column.id ? menuRef : null}
           >
             <span>{column.name}</span>
             <button
               type="button"
               className="column-menu-trigger"
-              onClick={() =>
-                setOpenColumnMenuId((currentId) => (currentId === column.id ? null : column.id))
-              }
+              onMouseDown={() => {
+                suppressCloseRef.current = true;
+                setOpenColumnMenuId((currentId) => (currentId === column.id ? null : column.id));
+              }}
               aria-label={`Open ${column.name} column menu`}
             >
               ⋯
             </button>
 
             {openColumnMenuId === column.id ? (
-              <div className="column-menu">
+              <div className="column-menu" onMouseDown={(e) => e.preventDefault()}>
                 <button
                   type="button"
-                  onClick={() => {
-                    onRenameChildColumn(parentItem.id, column.id);
+                  onMouseDown={() => {
                     setOpenColumnMenuId(null);
+                    onRenameChildColumn(parentItem.id, column.id);
                   }}
                 >
                   Rename column
@@ -140,9 +272,9 @@ function NestedItemsTable({
                 {column.type === 'status' ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      onEditChildStatusColumn(parentItem.id, column.id);
+                    onMouseDown={() => {
                       setOpenColumnMenuId(null);
+                      onEditChildStatusColumn(parentItem.id, column.id);
                     }}
                   >
                     Edit statuses
@@ -151,15 +283,37 @@ function NestedItemsTable({
                 <button
                   type="button"
                   className="destructive-menu-item"
-                  onClick={() => {
-                    onDeleteChildColumn(parentItem.id, column.id);
+                  onMouseDown={() => {
                     setOpenColumnMenuId(null);
+                    onDeleteChildColumn(parentItem.id, column.id);
                   }}
                 >
                   Delete column
                 </button>
               </div>
             ) : null}
+            <button
+              type="button"
+              className="column-resize-handle"
+              aria-label={`Resize ${column.name} column`}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                const startX = event.clientX;
+                const startWidth = getColumnWidth(column);
+
+                const handleMouseMove = (moveEvent: MouseEvent) => {
+                  onResizeColumn(column.id, startWidth + moveEvent.clientX - startX);
+                };
+
+                const handleMouseUp = () => {
+                  window.removeEventListener('mousemove', handleMouseMove);
+                  window.removeEventListener('mouseup', handleMouseUp);
+                };
+
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mouseup', handleMouseUp);
+              }}
+            />
           </div>
         ))}
         <button
@@ -183,23 +337,19 @@ function NestedItemsTable({
           onDeleteItem={onDeleteItem}
           onUpdateColumnValue={onUpdateColumnValue}
           onAddChildColumn={onAddChildColumn}
+          onResizeColumn={onResizeColumn}
           onRenameChildColumn={onRenameChildColumn}
           onEditChildStatusColumn={onEditChildStatusColumn}
           onDeleteChildColumn={onDeleteChildColumn}
         />
 
-        <div className="board-cell selector-cell empty-cell" />
         <button
           type="button"
-          className="board-cell add-item-row"
+          className="board-cell add-item-row add-item-row-full"
           onClick={() => onAddSubItem(parentItem.id)}
         >
           + Add subitem
         </button>
-        {parentItem.childColumns.map((column) => (
-          <div key={`nested-add-item-empty-${parentItem.id}-${column.id}`} className="board-cell empty-cell" />
-        ))}
-        <div className="board-cell empty-cell" />
       </div>
     </div>
   );
@@ -217,6 +367,7 @@ export function BoardRows({
   onDeleteItem,
   onUpdateColumnValue,
   onAddChildColumn,
+  onResizeColumn,
   onRenameChildColumn,
   onEditChildStatusColumn,
   onDeleteChildColumn,
@@ -278,25 +429,6 @@ export function BoardRows({
                 >
                   +
                 </button>
-
-                <button
-                  type="button"
-                  className="delete-item-button"
-                  onClick={() => onDeleteItem(item.id)}
-                  aria-label={`Delete ${item.title}`}
-                  title="Delete item"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M9 4h6m-9 3h12m-1 0-1 11H8L7 7m3 0V5h4v2"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
               </div>
             </div>
 
@@ -320,6 +452,7 @@ export function BoardRows({
                   onDeleteItem={onDeleteItem}
                   onUpdateColumnValue={onUpdateColumnValue}
                   onAddChildColumn={onAddChildColumn}
+                  onResizeColumn={onResizeColumn}
                   onRenameChildColumn={onRenameChildColumn}
                   onEditChildStatusColumn={onEditChildStatusColumn}
                   onDeleteChildColumn={onDeleteChildColumn}

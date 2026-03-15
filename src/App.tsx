@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AddColumnModal } from './components/AddColumnModal';
 import { EditStatusColumnModal } from './components/EditStatusColumnModal';
 import { GitHubTokenModal } from './components/GitHubTokenModal';
+import { RenameColumnModal } from './components/RenameColumnModal';
 import { BoardTable } from './components/BoardTable';
 import { BoardToolbar } from './components/BoardToolbar';
 import { initialBoardData } from './mockData';
@@ -15,17 +16,20 @@ import type {
   StatusOption,
 } from './types';
 import { getPagesWorkflowRunForCommit, loadBoardFromGitHub, saveBoardToGitHub } from './utils/github';
+import { getDefaultColumnWidth } from './utils/columns';
 import { loadBoardData, loadGitHubConfig, saveBoardData, saveGitHubConfig } from './utils/storage';
 import {
   addChildToItem,
-  addColumnToItems,
+  addSharedColumnToItems,
   clearRemovedStatusValues,
+  collapseItemDescendants,
   createEmptyGroup,
   createEmptyItem,
   findItemById,
   removeColumnFromItems,
   removeItemsByIds,
   removeItemById,
+  updateColumnDefinitionInItems,
   updateItemById,
 } from './utils/tree';
 import { createDefaultStatusOptions } from './utils/statusOptions';
@@ -79,6 +83,42 @@ const getTargetColumns = (board: BoardData, target: ColumnTarget): ColumnDefinit
     ? board.columns
     : findItemAcrossGroups(board.groups, target.itemId)?.childColumns ?? [];
 
+const collectChildColumns = (items: BoardItem[]): ColumnDefinition[] =>
+  items.reduce<ColumnDefinition[]>((allColumns, item) => {
+    const mergedColumns = [...allColumns];
+
+    for (const childColumn of item.childColumns) {
+      if (!mergedColumns.some((column) => column.id === childColumn.id)) {
+        mergedColumns.push(childColumn);
+      }
+    }
+
+    for (const nestedColumn of collectChildColumns(item.children)) {
+      if (!mergedColumns.some((column) => column.id === nestedColumn.id)) {
+        mergedColumns.push(nestedColumn);
+      }
+    }
+
+    return mergedColumns;
+  }, []);
+
+const getGroupColumns = (group: BoardGroup, boardColumns: ColumnDefinition[]) => [
+  ...boardColumns,
+  ...collectChildColumns(group.items).filter(
+    (childColumn) => !boardColumns.some((boardColumn) => boardColumn.id === childColumn.id),
+  ),
+];
+
+const findGroupIdByItemId = (groups: BoardGroup[], itemId: string): string | null => {
+  for (const group of groups) {
+    if (findItemById(group.items, itemId)) {
+      return group.id;
+    }
+  }
+
+  return null;
+};
+
 export default function App() {
   const [board, setBoard] = useState<BoardData>(() => loadBoardData() ?? initialBoardData);
   const [githubConfig, setGitHubConfig] = useState<GitHubConfig>(() => loadGitHubConfig());
@@ -91,6 +131,7 @@ export default function App() {
   const [pendingGitHubAction, setPendingGitHubAction] = useState<'save' | 'load' | null>(null);
   const [addColumnTarget, setAddColumnTarget] = useState<ColumnTarget | null>(null);
   const [editingStatusTarget, setEditingStatusTarget] = useState<StatusEditorTarget | null>(null);
+  const [renamingColumn, setRenamingColumn] = useState<{ columnId: string; currentName: string; scope: 'board' } | { columnId: string; currentName: string; scope: 'item'; itemId: string } | null>(null);
 
   useEffect(() => {
     saveBoardData(board);
@@ -130,6 +171,13 @@ export default function App() {
     }));
   };
 
+  const handleRenameBoard = (title: string) => {
+    setBoard((currentBoard) => ({
+      ...currentBoard,
+      title,
+    }));
+  };
+
   const handleRenameGroup = (groupId: string, name: string) => {
     setBoard((currentBoard) => ({
       ...currentBoard,
@@ -140,12 +188,22 @@ export default function App() {
     }));
   };
 
+  const handleChangeGroupColor = (groupId: string, color: string) => {
+    setBoard((currentBoard) => ({
+      ...currentBoard,
+      groups: updateGroupById(currentBoard.groups, groupId, (group) => ({
+        ...group,
+        color,
+      })),
+    }));
+  };
+
   const handleAddTopLevelItem = (groupId: string) => {
     setBoard((currentBoard) => ({
       ...currentBoard,
       groups: updateGroupById(currentBoard.groups, groupId, (group) => ({
         ...group,
-        items: [...group.items, createEmptyItem(currentBoard.columns, 'New item')],
+        items: [...group.items, createEmptyItem(getGroupColumns(group, currentBoard.columns), 'New item')],
       })),
     }));
   };
@@ -210,6 +268,7 @@ export default function App() {
         items: updateItemById(group.items, itemId, (item) => ({
           ...item,
           collapsed: !item.collapsed,
+          children: item.collapsed ? item.children : collapseItemDescendants(item.children),
         })),
       })),
     }));
@@ -246,89 +305,89 @@ export default function App() {
       name,
       type,
       statusOptions: type === 'status' ? createDefaultStatusOptions() : [],
+      width: getDefaultColumnWidth(type),
     };
 
     setBoard((currentBoard) => ({
-      ...(target.scope === 'board'
-        ? {
-            ...currentBoard,
-            columns: [...currentBoard.columns, nextColumn],
-            groups: currentBoard.groups.map((group) => ({
-              ...group,
-              items: addColumnToItems(group.items, nextColumn.id),
-            })),
-          }
-        : {
-            ...currentBoard,
-            groups: currentBoard.groups.map((group) => ({
-              ...group,
-              items: updateItemById(group.items, target.itemId, (item) => ({
-                ...item,
-                childColumns: [...item.childColumns, nextColumn],
-                children: addColumnToItems(item.children, nextColumn.id),
-              })),
-            })),
-          }),
+      ...currentBoard,
+      columns: target.scope === 'board'
+        ? [...currentBoard.columns, nextColumn]
+        : currentBoard.columns,
+      groups: currentBoard.groups.map((group) => ({
+        ...group,
+        items: addSharedColumnToItems(group.items, nextColumn),
+      })),
     }));
 
     setAddColumnTarget(null);
   };
 
+  const findColumnAnywhere = (columnId: string): ColumnDefinition | undefined => {
+    const boardCol = board.columns.find((c) => c.id === columnId);
+    if (boardCol) return boardCol;
+    for (const group of board.groups) {
+      const found = collectChildColumns(group.items).find((c) => c.id === columnId);
+      if (found) return found;
+    }
+    return undefined;
+  };
+
   const handleRenameColumn = (columnId: string) => {
-    const column = board.columns.find((entry) => entry.id === columnId);
-    if (!column) {
-      return;
-    }
-
-    const nextName = window.prompt('Rename column', column.name)?.trim();
-    if (!nextName) {
-      return;
-    }
-
-    setBoard((currentBoard) => ({
-      ...currentBoard,
-      columns: currentBoard.columns.map((entry) =>
-        entry.id === columnId ? { ...entry, name: nextName } : entry,
-      ),
-    }));
+    const column = findColumnAnywhere(columnId);
+    if (!column) return;
+    setRenamingColumn({ columnId, currentName: column.name, scope: 'board' });
   };
 
   const handleRenameChildColumn = (itemId: string, columnId: string) => {
     const parentItem = findItemAcrossGroups(board.groups, itemId);
     const column = parentItem?.childColumns.find((entry) => entry.id === columnId);
-    if (!column) {
-      return;
-    }
+    if (!column) return;
+    setRenamingColumn({ columnId, currentName: column.name, scope: 'item', itemId });
+  };
 
-    const nextName = window.prompt('Rename column', column.name)?.trim();
-    if (!nextName) {
-      return;
-    }
+  const handleCommitRename = (nextName: string) => {
+    if (!renamingColumn) return;
+    const { columnId, scope } = renamingColumn;
 
-    setBoard((currentBoard) => ({
-      ...currentBoard,
-      groups: currentBoard.groups.map((group) => ({
-        ...group,
-        items: updateItemById(group.items, itemId, (item) => ({
-          ...item,
-          childColumns: item.childColumns.map((entry) =>
-            entry.id === columnId ? { ...entry, name: nextName } : entry,
-          ),
+    if (scope === 'board') {
+      setBoard((currentBoard) => ({
+        ...currentBoard,
+        columns: currentBoard.columns.map((entry) =>
+          entry.id === columnId ? { ...entry, name: nextName } : entry,
+        ),
+        groups: currentBoard.groups.map((group) => ({
+          ...group,
+          items: updateColumnDefinitionInItems(group.items, columnId, (col) => ({
+            ...col,
+            name: nextName,
+          })),
         })),
-      })),
-    }));
+      }));
+    } else {
+      const { itemId } = renamingColumn;
+      setBoard((currentBoard) => ({
+        ...currentBoard,
+        groups: currentBoard.groups.map((group) => ({
+          ...group,
+          items:
+            findItemById(group.items, itemId) !== null
+              ? updateColumnDefinitionInItems(group.items, columnId, (col) => ({
+                  ...col,
+                  name: nextName,
+                }))
+              : group.items,
+        })),
+      }));
+    }
+
+    setRenamingColumn(null);
   };
 
   const handleDeleteColumn = (columnId: string) => {
-    const column = board.columns.find((entry) => entry.id === columnId);
-    if (!column) {
-      return;
-    }
+    const column = findColumnAnywhere(columnId);
+    if (!column) return;
 
-    const confirmed = window.confirm(`Delete column "${column.name}"?`);
-    if (!confirmed) {
-      return;
-    }
+    if (!window.confirm(`Delete column "${column.name}"?`)) return;
 
     setBoard((currentBoard) => ({
       ...currentBoard,
@@ -347,8 +406,7 @@ export default function App() {
       return;
     }
 
-    const confirmed = window.confirm(`Delete column "${column.name}"?`);
-    if (!confirmed) {
+    if (!window.confirm(`Delete column "${column.name}"?`)) {
       return;
     }
 
@@ -356,11 +414,36 @@ export default function App() {
       ...currentBoard,
       groups: currentBoard.groups.map((group) => ({
         ...group,
-        items: updateItemById(group.items, itemId, (item) => ({
-          ...item,
-          childColumns: item.childColumns.filter((entry) => entry.id !== columnId),
-          children: removeColumnFromItems(item.children, columnId),
-        })),
+        items:
+          findItemById(group.items, itemId) !== null
+            ? removeColumnFromItems(group.items, columnId)
+            : group.items,
+      })),
+    }));
+  };
+
+  const handleResizeColumn = (groupId: string, columnId: string, width: number) => {
+    const nextWidth = Math.max(width, 140);
+
+    setBoard((currentBoard) => ({
+      ...currentBoard,
+      columns: currentBoard.columns.map((column) =>
+        column.id === columnId ? { ...column, width: nextWidth } : column,
+      ),
+      groups: currentBoard.groups.map((group) => ({
+        ...group,
+        items:
+          group.id === groupId
+            ? updateColumnDefinitionInItems(group.items, columnId, (column) => ({
+                ...column,
+                width: nextWidth,
+              }))
+            : currentBoard.columns.some((column) => column.id === columnId)
+              ? updateColumnDefinitionInItems(group.items, columnId, (column) => ({
+                  ...column,
+                  width: nextWidth,
+                }))
+              : group.items,
       })),
     }));
   };
@@ -385,20 +468,41 @@ export default function App() {
             ),
             groups: currentBoard.groups.map((group) => ({
               ...group,
-              items: clearRemovedStatusValues(group.items, target.columnId, validStatusIds),
+              items: updateColumnDefinitionInItems(
+                clearRemovedStatusValues(
+                  group.items,
+                  target.columnId,
+                  validStatusIds,
+                  statusOptions[0]?.id ?? '',
+                ),
+                target.columnId,
+                (column) => ({
+                  ...column,
+                  statusOptions,
+                }),
+              ),
             })),
           }
         : {
             ...currentBoard,
             groups: currentBoard.groups.map((group) => ({
               ...group,
-              items: updateItemById(group.items, target.itemId, (item) => ({
-                ...item,
-                childColumns: item.childColumns.map((column) =>
-                  column.id === target.columnId ? { ...column, statusOptions } : column,
-                ),
-                children: clearRemovedStatusValues(item.children, target.columnId, validStatusIds),
-              })),
+              items:
+                findItemById(group.items, target.itemId) !== null
+                  ? updateColumnDefinitionInItems(
+                      clearRemovedStatusValues(
+                        group.items,
+                        target.columnId,
+                        validStatusIds,
+                        statusOptions[0]?.id ?? '',
+                      ),
+                      target.columnId,
+                      (column) => ({
+                        ...column,
+                        statusOptions,
+                      }),
+                    )
+                  : group.items,
             })),
           }),
     }));
@@ -649,7 +753,9 @@ export default function App() {
 
   const editingStatusColumn =
     editingStatusTarget?.scope === 'board'
-      ? columns.find((column) => column.id === editingStatusTarget.columnId) ?? null
+      ? (columns.find((column) => column.id === editingStatusTarget.columnId) ??
+          findColumnAnywhere(editingStatusTarget.columnId) ??
+          null)
       : editingStatusTarget?.scope === 'item'
         ? findItemAcrossGroups(groups, editingStatusTarget.itemId)?.childColumns.find(
             (column) => column.id === editingStatusTarget.columnId,
@@ -659,6 +765,8 @@ export default function App() {
   return (
     <main className="app-shell">
       <BoardToolbar
+        boardTitle={board.title}
+        onBoardTitleChange={handleRenameBoard}
         onSaveToGitHub={handleSaveToGitHub}
         onLoadFromGitHub={handleLoadFromGitHub}
         onSetGitHubToken={handleSetGitHubToken}
@@ -682,6 +790,12 @@ export default function App() {
         onClose={() => setAddColumnTarget(null)}
         onSubmit={handleCreateColumn}
       />
+      <RenameColumnModal
+        isOpen={renamingColumn !== null}
+        initialName={renamingColumn?.currentName ?? ''}
+        onClose={() => setRenamingColumn(null)}
+        onSubmit={handleCommitRename}
+      />
       <EditStatusColumnModal
         isOpen={editingStatusColumn !== null}
         columnName={editingStatusColumn?.name ?? 'Status'}
@@ -697,18 +811,25 @@ export default function App() {
       />
 
       {groups.map((group) => (
+        (() => {
+          const groupColumns = getGroupColumns(group, columns);
+
+          return (
         <BoardTable
           key={group.id}
           groupName={group.name}
+          groupColor={group.color}
           items={group.items}
-          columns={columns}
+          columns={groupColumns}
           selectedItemIds={selectedItemIds}
           onGroupNameChange={(nextName) => handleRenameGroup(group.id, nextName)}
+          onGroupColorChange={(nextColor) => handleChangeGroupColor(group.id, nextColor)}
           onAddColumn={handleAddColumn}
           onAddTopLevelItem={() => handleAddTopLevelItem(group.id)}
           onRenameColumn={handleRenameColumn}
           onEditStatusColumn={handleOpenStatusEditor}
           onDeleteColumn={handleDeleteColumn}
+          onResizeColumn={(columnId, width) => handleResizeColumn(group.id, columnId, width)}
           onAddChildColumn={handleAddChildColumn}
           onRenameChildColumn={handleRenameChildColumn}
           onEditChildStatusColumn={handleOpenChildStatusEditor}
@@ -723,6 +844,8 @@ export default function App() {
             handleUpdateColumnValue(group.id, itemId, columnId, value)
           }
         />
+          );
+        })()
       ))}
 
       <button type="button" className="add-group-button" onClick={handleAddGroup}>

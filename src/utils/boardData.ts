@@ -6,13 +6,18 @@ import type {
   ColumnType,
   StatusOption,
 } from '../types';
+import { getDefaultColumnWidth } from './columns';
 import { createDefaultStatusOptions } from './statusOptions';
+import { getDefaultColumnValue } from './tree';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const normalizeColor = (value: unknown, fallback: string) =>
+  typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+
 const normalizeColumnType = (value: unknown): ColumnType =>
-  value === 'status' ? 'status' : 'text';
+  value === 'status' || value === 'list' ? value : 'text';
 
 const normalizeStatusOptions = (value: unknown): StatusOption[] => {
   if (!Array.isArray(value)) {
@@ -58,7 +63,18 @@ const normalizeColumns = (value: unknown): ColumnDefinition[] => {
           })()
         : [];
 
-    return [{ id: column.id, name: column.name, type, statusOptions }];
+    return [
+      {
+        id: column.id,
+        name: column.name,
+        type,
+        statusOptions,
+        width:
+          typeof column.width === 'number' && Number.isFinite(column.width)
+            ? Math.max(column.width, 140)
+            : getDefaultColumnWidth(type),
+      },
+    ];
   });
 };
 
@@ -75,10 +91,14 @@ const normalizeItem = (
     columns.map((column) => {
       const rawValue = rawColumns[column.id];
       if (typeof rawValue !== 'string') {
-        return [column.id, ''];
+        return [column.id, getDefaultColumnValue(column)];
       }
 
-      if (column.type !== 'status') {
+      if (column.type === 'text') {
+        return [column.id, rawValue];
+      }
+
+      if (column.type === 'list') {
         return [column.id, rawValue];
       }
 
@@ -86,13 +106,19 @@ const normalizeItem = (
         (statusOption) => statusOption.id === rawValue || statusOption.label === rawValue,
       );
 
-      return [column.id, matchingStatus?.id ?? ''];
+      return [column.id, matchingStatus?.id ?? getDefaultColumnValue(column)];
     }),
   );
 
   const rawChildren = Array.isArray(value.children) ? value.children : [];
   const hasChildColumnsField = Object.prototype.hasOwnProperty.call(value, 'childColumns');
-  const childColumns = hasChildColumnsField ? normalizeColumns(value.childColumns) : columns;
+  const normalizedChildColumns = hasChildColumnsField ? normalizeColumns(value.childColumns) : [];
+  const childColumns = [
+    ...columns,
+    ...normalizedChildColumns.filter(
+      (childColumn) => !columns.some((parentColumn) => parentColumn.id === childColumn.id),
+    ),
+  ];
   const children = rawChildren.flatMap((child) => {
     const normalizedChild = normalizeItem(child, childColumns);
     return normalizedChild ? [normalizedChild] : [];
@@ -130,6 +156,7 @@ const normalizeGroup = (
   return {
     id: value.id,
     name: typeof value.name === 'string' ? value.name : 'New group',
+    color: normalizeColor(value.color, '#579bfc'),
     items,
   };
 };
@@ -163,6 +190,7 @@ export const parseBoardData = (value: unknown): BoardData | null => {
               {
                 id: 'group-imported',
                 name: typeof value.title === 'string' ? value.title : 'Group 1',
+                color: '#579bfc',
                 items: legacyGroupItems,
               },
             ]

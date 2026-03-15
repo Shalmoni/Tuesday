@@ -1,4 +1,10 @@
-export type ColumnType = 'text' | 'status';
+export type ColumnType = 'text' | 'status' | 'list';
+
+export interface ListColumnEntry {
+  id: string;
+  left: string;
+  right: string;
+}
 
 export interface StatusOption {
   id: string;
@@ -11,6 +17,7 @@ export interface ColumnDefinition {
   name: string;
   type: ColumnType;
   statusOptions: StatusOption[];
+  width?: number;
 }
 
 export interface BoardItem {
@@ -25,6 +32,7 @@ export interface BoardItem {
 export interface BoardGroup {
   id: string;
   name: string;
+  color: string;
   items: BoardItem[];
 }
 

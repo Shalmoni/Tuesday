@@ -1,18 +1,22 @@
-import { KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { CSSProperties, KeyboardEvent, useEffect, useRef, useState } from 'react';
 import type { BoardItem, ColumnDefinition } from '../types';
 import { BoardRows } from './BoardRows';
+import { getColumnWidth } from '../utils/columns';
 
 interface BoardTableProps {
   groupName: string;
+  groupColor: string;
   items: BoardItem[];
   columns: ColumnDefinition[];
   selectedItemIds: Set<string>;
   onGroupNameChange: (value: string) => void;
+  onGroupColorChange: (value: string) => void;
   onAddColumn: () => void;
   onAddTopLevelItem: () => void;
   onRenameColumn: (columnId: string) => void;
   onEditStatusColumn: (columnId: string) => void;
   onDeleteColumn: (columnId: string) => void;
+  onResizeColumn: (columnId: string, width: number) => void;
   onAddChildColumn: (itemId: string) => void;
   onRenameChildColumn: (itemId: string, columnId: string) => void;
   onEditChildStatusColumn: (itemId: string, columnId: string) => void;
@@ -28,15 +32,18 @@ interface BoardTableProps {
 
 export function BoardTable({
   groupName,
+  groupColor,
   items,
   columns,
   selectedItemIds,
   onGroupNameChange,
+  onGroupColorChange,
   onAddColumn,
   onAddTopLevelItem,
   onRenameColumn,
   onEditStatusColumn,
   onDeleteColumn,
+  onResizeColumn,
   onAddChildColumn,
   onRenameChildColumn,
   onEditChildStatusColumn,
@@ -51,6 +58,7 @@ export function BoardTable({
 }: BoardTableProps) {
   const [openColumnMenuId, setOpenColumnMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const suppressCloseRef = useRef(false);
 
   useEffect(() => {
     if (!openColumnMenuId) {
@@ -58,6 +66,10 @@ export function BoardTable({
     }
 
     const handlePointerDown = (event: MouseEvent) => {
+      if (suppressCloseRef.current) {
+        suppressCloseRef.current = false;
+        return;
+      }
       if (!menuRef.current?.contains(event.target as Node)) {
         setOpenColumnMenuId(null);
       }
@@ -73,61 +85,73 @@ export function BoardTable({
     }
   };
   const templateColumns = `56px minmax(320px, 1.8fr) ${columns
-    .map(() => 'minmax(180px, 1fr)')
+    .map((column) => `${getColumnWidth(column)}px`)
     .join(' ')} 56px`;
+  const groupStyle = {
+    '--group-accent': groupColor,
+  } as CSSProperties & Record<'--group-accent', string>;
 
   return (
-    <section className="board-shell">
-      <div className="board-title-bar">
-        <button type="button" className="board-title-toggle" aria-label="Board expanded">
-          ▾
-        </button>
-        <input
-          className="group-name-input"
-          value={groupName}
-          onChange={(event) => onGroupNameChange(event.target.value)}
-          onKeyDown={handleEnterKey}
-          aria-label="Group name"
-        />
+    <section className="board-shell" style={groupStyle}>
+      <div className="board-shell-header">
+        <div className="board-title-bar">
+          <label className="group-color-picker" aria-label="Group color">
+            <input
+              type="color"
+              value={groupColor}
+              onChange={(event) => onGroupColorChange(event.target.value)}
+              aria-label="Group color"
+            />
+          </label>
+          <input
+            className="group-name-input"
+            value={groupName}
+            onChange={(event) => onGroupNameChange(event.target.value)}
+            onKeyDown={handleEnterKey}
+            aria-label="Group name"
+          />
+        </div>
+
+        {selectedItemIds.size > 0 ? (
+          <div className="bulk-action-bar">
+            <span>{selectedItemIds.size} item{selectedItemIds.size === 1 ? '' : 's'} selected</span>
+            <button type="button" className="bulk-delete-button" onClick={onDeleteSelectedItems}>
+              Delete
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {selectedItemIds.size > 0 ? (
-        <div className="bulk-action-bar">
-          <span>{selectedItemIds.size} item{selectedItemIds.size === 1 ? '' : 's'} selected</span>
-          <button type="button" className="bulk-delete-button" onClick={onDeleteSelectedItems}>
-            Delete
-          </button>
-        </div>
-      ) : null}
-
+      <div className="board-scroll-area">
       <div className="board-table" style={{ gridTemplateColumns: templateColumns }}>
         <div className="board-header-cell selector-header" />
-        <div className="board-header-cell">Item</div>
+        <div className="board-header-cell item-header-cell">Item</div>
         {columns.map((column) => (
           <div
             key={column.id}
-            className="board-header-cell column-header-cell"
+            className={`board-header-cell column-header-cell${openColumnMenuId === column.id ? ' menu-open' : ''}`}
             ref={openColumnMenuId === column.id ? menuRef : null}
           >
             <span>{column.name}</span>
             <button
               type="button"
               className="column-menu-trigger"
-              onClick={() =>
-                setOpenColumnMenuId((currentId) => (currentId === column.id ? null : column.id))
-              }
+              onMouseDown={() => {
+                suppressCloseRef.current = true;
+                setOpenColumnMenuId((currentId) => (currentId === column.id ? null : column.id));
+              }}
               aria-label={`Open ${column.name} column menu`}
             >
               ⋯
             </button>
 
             {openColumnMenuId === column.id ? (
-              <div className="column-menu">
+              <div className="column-menu" onMouseDown={(e) => e.preventDefault()}>
                 <button
                   type="button"
-                  onClick={() => {
-                    onRenameColumn(column.id);
+                  onMouseDown={() => {
                     setOpenColumnMenuId(null);
+                    onRenameColumn(column.id);
                   }}
                 >
                   Rename column
@@ -135,9 +159,9 @@ export function BoardTable({
                 {column.type === 'status' ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      onEditStatusColumn(column.id);
+                    onMouseDown={() => {
                       setOpenColumnMenuId(null);
+                      onEditStatusColumn(column.id);
                     }}
                   >
                     Edit statuses
@@ -146,15 +170,37 @@ export function BoardTable({
                 <button
                   type="button"
                   className="destructive-menu-item"
-                  onClick={() => {
-                    onDeleteColumn(column.id);
+                  onMouseDown={() => {
                     setOpenColumnMenuId(null);
+                    onDeleteColumn(column.id);
                   }}
                 >
                   Delete column
                 </button>
               </div>
             ) : null}
+            <button
+              type="button"
+              className="column-resize-handle"
+              aria-label={`Resize ${column.name} column`}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                const startX = event.clientX;
+                const startWidth = getColumnWidth(column);
+
+                const handleMouseMove = (moveEvent: MouseEvent) => {
+                  onResizeColumn(column.id, startWidth + moveEvent.clientX - startX);
+                };
+
+                const handleMouseUp = () => {
+                  window.removeEventListener('mousemove', handleMouseMove);
+                  window.removeEventListener('mouseup', handleMouseUp);
+                };
+
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mouseup', handleMouseUp);
+              }}
+            />
           </div>
         ))}
         <button
@@ -178,19 +224,16 @@ export function BoardTable({
           onDeleteItem={onDeleteItem}
           onUpdateColumnValue={onUpdateColumnValue}
           onAddChildColumn={onAddChildColumn}
+          onResizeColumn={onResizeColumn}
           onRenameChildColumn={onRenameChildColumn}
           onEditChildStatusColumn={onEditChildStatusColumn}
           onDeleteChildColumn={onDeleteChildColumn}
         />
 
-        <div className="board-cell selector-cell empty-cell" />
-        <button type="button" className="board-cell add-item-row" onClick={onAddTopLevelItem}>
+        <button type="button" className="board-cell add-item-row add-item-row-full" onClick={onAddTopLevelItem}>
           + Add item
         </button>
-        {columns.map((column) => (
-          <div key={`add-item-empty-${column.id}`} className="board-cell empty-cell" />
-        ))}
-        <div className="board-cell empty-cell" />
+      </div>
       </div>
     </section>
   );

@@ -77,6 +77,13 @@ export function AddColumnModal({ isOpen, onClose, onSubmit }: AddColumnModalProp
             >
               Status
             </button>
+            <button
+              type="button"
+              className={type === 'list' ? 'column-type-button active' : 'column-type-button'}
+              onClick={() => setType('list')}
+            >
+              List
+            </button>
           </div>
 
           <div className="modal-actions">
