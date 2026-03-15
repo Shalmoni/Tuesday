@@ -1,6 +1,12 @@
-import type { BoardItem, ColumnDefinition } from '../types';
+import type { BoardGroup, BoardItem, ColumnDefinition } from '../types';
 
 const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
+
+export const createEmptyGroup = (name = 'New group'): BoardGroup => ({
+  id: createId('group'),
+  name,
+  items: [],
+});
 
 export const createEmptyItem = (
   columns: ColumnDefinition[],
@@ -9,9 +15,25 @@ export const createEmptyItem = (
   id: createId('item'),
   title,
   columns: Object.fromEntries(columns.map((column) => [column.id, ''])),
+  childColumns: [],
   children: [],
   collapsed: false,
 });
+
+export const findItemById = (items: BoardItem[], itemId: string): BoardItem | null => {
+  for (const item of items) {
+    if (item.id === itemId) {
+      return item;
+    }
+
+    const nestedMatch = findItemById(item.children, itemId);
+    if (nestedMatch) {
+      return nestedMatch;
+    }
+  }
+
+  return null;
+};
 
 export const updateItemById = (
   items: BoardItem[],
@@ -71,6 +93,20 @@ export const removeColumnFromItems = (
       children: removeColumnFromItems(item.children, columnId),
     };
   });
+
+export const clearRemovedStatusValues = (
+  items: BoardItem[],
+  columnId: string,
+  validStatusIds: Set<string>,
+): BoardItem[] =>
+  items.map((item) => ({
+    ...item,
+    columns: {
+      ...item.columns,
+      [columnId]: validStatusIds.has(item.columns[columnId]) ? item.columns[columnId] : '',
+    },
+    children: clearRemovedStatusValues(item.children, columnId, validStatusIds),
+  }));
 
 export const removeItemsByIds = (
   items: BoardItem[],

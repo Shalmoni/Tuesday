@@ -1,4 +1,4 @@
-import { KeyboardEvent, useState } from 'react';
+import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import type { BoardItem, ColumnDefinition } from '../types';
 import { BoardRows } from './BoardRows';
 
@@ -11,7 +11,12 @@ interface BoardTableProps {
   onAddColumn: () => void;
   onAddTopLevelItem: () => void;
   onRenameColumn: (columnId: string) => void;
+  onEditStatusColumn: (columnId: string) => void;
   onDeleteColumn: (columnId: string) => void;
+  onAddChildColumn: (itemId: string) => void;
+  onRenameChildColumn: (itemId: string, columnId: string) => void;
+  onEditChildStatusColumn: (itemId: string, columnId: string) => void;
+  onDeleteChildColumn: (itemId: string, columnId: string) => void;
   onToggleSelectItem: (itemId: string) => void;
   onDeleteSelectedItems: () => void;
   onToggleExpand: (itemId: string) => void;
@@ -30,7 +35,12 @@ export function BoardTable({
   onAddColumn,
   onAddTopLevelItem,
   onRenameColumn,
+  onEditStatusColumn,
   onDeleteColumn,
+  onAddChildColumn,
+  onRenameChildColumn,
+  onEditChildStatusColumn,
+  onDeleteChildColumn,
   onToggleSelectItem,
   onDeleteSelectedItems,
   onToggleExpand,
@@ -40,6 +50,23 @@ export function BoardTable({
   onUpdateColumnValue,
 }: BoardTableProps) {
   const [openColumnMenuId, setOpenColumnMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!openColumnMenuId) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpenColumnMenuId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [openColumnMenuId]);
+
   const handleEnterKey = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.currentTarget.blur();
@@ -77,7 +104,11 @@ export function BoardTable({
         <div className="board-header-cell selector-header" />
         <div className="board-header-cell">Item</div>
         {columns.map((column) => (
-          <div key={column.id} className="board-header-cell column-header-cell">
+          <div
+            key={column.id}
+            className="board-header-cell column-header-cell"
+            ref={openColumnMenuId === column.id ? menuRef : null}
+          >
             <span>{column.name}</span>
             <button
               type="button"
@@ -101,6 +132,17 @@ export function BoardTable({
                 >
                   Rename column
                 </button>
+                {column.type === 'status' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onEditStatusColumn(column.id);
+                      setOpenColumnMenuId(null);
+                    }}
+                  >
+                    Edit statuses
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="destructive-menu-item"
@@ -135,6 +177,10 @@ export function BoardTable({
           onAddSubItem={onAddSubItem}
           onDeleteItem={onDeleteItem}
           onUpdateColumnValue={onUpdateColumnValue}
+          onAddChildColumn={onAddChildColumn}
+          onRenameChildColumn={onRenameChildColumn}
+          onEditChildStatusColumn={onEditChildStatusColumn}
+          onDeleteChildColumn={onDeleteChildColumn}
         />
 
         <div className="board-cell selector-cell empty-cell" />

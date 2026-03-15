@@ -21,7 +21,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -58,17 +59,6 @@ button {
   color: #1b2b59;
 }
 
-.toolbar-heading {
-  display: grid;
-  gap: 6px;
-}
-
-.toolbar-subcopy {
-  margin: 0;
-  max-width: 700px;
-  color: #60708d;
-}
-
 .toolbar-actions-shell {
   display: grid;
   gap: 8px;
@@ -80,6 +70,7 @@ button {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .toolbar-button {
@@ -92,6 +83,19 @@ button {
   font-weight: 600;
 }
 
+.toolbar-icon-button {
+  width: 46px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar-icon-button svg {
+  width: 20px;
+  height: 20px;
+}
+
 .toolbar-button:hover {
   background: #f7faff;
 }
@@ -99,6 +103,59 @@ button {
 .toolbar-button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.toolbar-menu-shell {
+  position: relative;
+}
+
+.toolbar-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 38px;
+  border: 1px solid #d6deed;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #41516f;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.toolbar-menu-trigger:hover {
+  background: #f7faff;
+}
+
+.toolbar-menu-trigger:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.toolbar-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 3;
+  display: grid;
+  min-width: 180px;
+  padding: 6px;
+  border: 1px solid #d8deec;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 32px rgba(38, 54, 86, 0.14);
+}
+
+.toolbar-menu button {
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: #22314f;
+  text-align: left;
+}
+
+.toolbar-menu button:hover {
+  background: #f3f7ff;
 }
 
 .primary-toolbar-button {
@@ -111,11 +168,154 @@ button {
   background: #245ce0;
 }
 
+.github-status-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 20px;
+}
+
+.github-status-pill {
+  min-width: 58px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .github-status-message {
   margin: 0;
-  min-height: 20px;
   color: #60708d;
   font-size: 0.92rem;
+}
+
+.github-status-neutral .github-status-pill {
+  background: #eef2f8;
+  color: #53627c;
+}
+
+.github-status-pending .github-status-pill {
+  background: #fff1d6;
+  color: #8a5a00;
+}
+
+.github-status-success .github-status-pill {
+  background: #def7ea;
+  color: #0f7b45;
+}
+
+.github-status-error .github-status-pill {
+  background: #ffe3e3;
+  color: #b42318;
+}
+
+.github-status-error .github-status-message {
+  color: #b42318;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(25, 32, 48, 0.42);
+}
+
+.modal-card {
+  width: min(560px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid #d8deec;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(29, 42, 68, 0.22);
+}
+
+.modal-card h2 {
+  margin: 0 0 8px;
+  color: #1b2b59;
+  font-size: 1.45rem;
+}
+
+.modal-copy {
+  margin: 0 0 18px;
+  color: #60708d;
+}
+
+.modal-form {
+  display: grid;
+  gap: 16px;
+}
+
+.modal-form input {
+  height: 46px;
+  padding: 0 14px;
+  border: 2px solid #7b67b6;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1a2440;
+}
+
+.modal-form input:focus {
+  outline: none;
+  border-color: #5f7dff;
+  box-shadow: 0 0 0 4px rgba(95, 125, 255, 0.1);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.column-type-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.column-type-button {
+  height: 46px;
+  border: 1px solid #d8deec;
+  border-radius: 14px;
+  background: #f8faff;
+  color: #51607b;
+  font-weight: 600;
+}
+
+.column-type-button:hover {
+  background: #f0f5ff;
+  color: #274a9b;
+}
+
+.column-type-button.active {
+  border-color: #6d62b5;
+  background: #f2effe;
+  color: #4e4b8a;
+}
+
+.modal-secondary-button,
+.modal-primary-button {
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.modal-secondary-button {
+  background: #ede8fb;
+  color: #4e4b8a;
+}
+
+.modal-primary-button {
+  background: #6d62b5;
+  color: #ffffff;
 }
 
 .github-panel {
@@ -163,6 +363,7 @@ button {
   border-radius: 14px;
   background: #ffffff;
   box-shadow: 0 18px 40px rgba(38, 54, 86, 0.08);
+  margin-bottom: 18px;
 }
 
 .board-title-bar {
@@ -359,6 +560,25 @@ button {
   background: #f7faff;
 }
 
+.status-select {
+  border-color: #dce3f0;
+  background-color: #f7f9fd;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--status-arrow-color, #6d7b94) 50%),
+    linear-gradient(135deg, var(--status-arrow-color, #6d7b94) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 11px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 30px;
+}
+
+.status-filled {
+  font-weight: 700;
+}
+
 .item-name-input {
   font-weight: 600;
   font-size: 0.98rem;
@@ -383,17 +603,24 @@ button {
 }
 
 .delete-item-button {
-  padding: 0 10px;
+  width: 28px;
   height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border-radius: 8px;
   background: transparent;
   color: #c73b42;
-  font-size: 0.82rem;
-  font-weight: 600;
 }
 
 .delete-item-button:hover {
   background: #fff1f1;
+}
+
+.delete-item-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .add-column-header {
@@ -458,9 +685,96 @@ button {
   background: #fff1f1;
 }
 
+.status-options-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.status-option-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) 52px auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.status-color-input {
+  width: 52px;
+  height: 42px;
+  padding: 4px;
+  border: 1px solid #d8deec;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.status-preview-pill {
+  min-width: 112px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.92rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.remove-status-button,
+.add-status-option-button {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #f4f6fb;
+  color: #44526d;
+  font-weight: 600;
+}
+
+.remove-status-button:hover,
+.add-status-option-button:hover {
+  background: #edf3ff;
+  color: #2b5fd9;
+}
+
+.remove-status-button {
+  color: #c73b42;
+  background: #fff6f6;
+}
+
+.remove-status-button:hover {
+  background: #fff1f1;
+  color: #b73138;
+}
+
 .add-column-spacer,
 .empty-cell {
   background: #ffffff;
+}
+
+.subitems-row {
+  grid-column: 1 / -1;
+  padding: 0 0 0 34px;
+  background: #ffffff;
+  border-bottom: 1px solid #e0e6f2;
+}
+
+.subitems-shell {
+  padding: 0 0 0 22px;
+  background:
+    linear-gradient(90deg, #dbe6ff 0, #dbe6ff 2px, transparent 2px);
+}
+
+.nested-board-table {
+  min-width: 0;
+  border-top: 0;
+}
+
+.nested-board-table::before {
+  width: 3px;
+  background: #3d78f4;
+}
+
+.nested-board-table .board-header-cell {
+  background: #fbfcff;
 }
 
 .add-item-row {
@@ -474,6 +788,30 @@ button {
 .add-item-row:hover {
   background: #f0f5ff;
   color: #245de8;
+}
+
+.add-group-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 18px;
+  border: 1px solid #d8deec;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #41516f;
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+.add-group-button:hover {
+  background: #f7faff;
+}
+
+.add-group-plus {
+  font-size: 1.9rem;
+  font-weight: 300;
+  line-height: 1;
 }
 
 @media (max-width: 900px) {
