@@ -46,20 +46,25 @@ button {
   top: 0;
   z-index: 12;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 6px;
   margin-bottom: 18px;
   padding: 12px 4px 10px;
   background: transparent;
-  flex-wrap: wrap;
+}
+
+.toolbar-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .toolbar-title-shell {
   display: flex;
   align-items: center;
-  min-width: min(720px, 100%);
-  max-width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .page-corner-logo {

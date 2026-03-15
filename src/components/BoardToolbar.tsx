@@ -52,80 +52,81 @@ export function BoardToolbar({
     <>
       <img className="page-corner-logo" src="./tree-logo.png" alt="" aria-hidden="true" />
       <section className="toolbar">
-        <div className="toolbar-title-shell">
-        <input
-          className="toolbar-title-input"
-          value={boardTitle}
-          onChange={(event) => onBoardTitleChange(event.target.value)}
-          onKeyDown={handleEnterKey}
-          aria-label="Board title"
-        />
-      </div>
+        <div className="toolbar-main-row">
+          <div className="toolbar-title-shell">
+            <input
+              className="toolbar-title-input"
+              value={boardTitle}
+              onChange={(event) => onBoardTitleChange(event.target.value)}
+              onKeyDown={handleEnterKey}
+              aria-label="Board title"
+            />
+          </div>
 
-      <div className="toolbar-actions-shell">
-        <div className="toolbar-actions">
-          <button
-            type="button"
-            className="toolbar-button toolbar-icon-button"
-            onClick={onLoadFromGitHub}
-            disabled={githubBusy}
-            aria-label="Load from GitHub"
-            title="Load from GitHub"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 4v10m0 0 4-4m-4 4-4-4M5 18h14"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="toolbar-button toolbar-icon-button primary-toolbar-button"
-            onClick={onSaveToGitHub}
-            disabled={githubBusy}
-            aria-label={githubBusy ? 'Saving to GitHub' : 'Save to GitHub'}
-            title={githubBusy ? 'Saving to GitHub' : 'Save to GitHub'}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M6 4h10l3 3v13H5V4h1Zm2 0v5h7V4M8 20v-6h8v6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-          <div className="toolbar-menu-shell" ref={menuRef}>
+          <div className="toolbar-actions">
             <button
               type="button"
-              className="toolbar-menu-trigger"
-              onClick={() => setMenuOpen((currentValue) => !currentValue)}
+              className="toolbar-button toolbar-icon-button"
+              onClick={onLoadFromGitHub}
               disabled={githubBusy}
-              aria-label="Open toolbar menu"
+              aria-label="Load from GitHub"
+              title="Load from GitHub"
             >
-              ⋮
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 4v10m0 0 4-4m-4 4-4-4M5 18h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
+            <button
+              type="button"
+              className="toolbar-button toolbar-icon-button primary-toolbar-button"
+              onClick={onSaveToGitHub}
+              disabled={githubBusy}
+              aria-label={githubBusy ? 'Saving to GitHub' : 'Save to GitHub'}
+              title={githubBusy ? 'Saving to GitHub' : 'Save to GitHub'}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M6 4h10l3 3v13H5V4h1Zm2 0v5h7V4M8 20v-6h8v6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <div className="toolbar-menu-shell" ref={menuRef}>
+              <button
+                type="button"
+                className="toolbar-menu-trigger"
+                onClick={() => setMenuOpen((currentValue) => !currentValue)}
+                disabled={githubBusy}
+                aria-label="Open toolbar menu"
+              >
+                ⋮
+              </button>
 
-            {menuOpen ? (
-              <div className="toolbar-menu">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSetGitHubToken();
-                    setMenuOpen(false);
-                  }}
-                >
-                  {hasGitHubToken ? 'Change GitHub token' : 'Set GitHub token'}
-                </button>
-              </div>
-            ) : null}
+              {menuOpen ? (
+                <div className="toolbar-menu">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSetGitHubToken();
+                      setMenuOpen(false);
+                    }}
+                  >
+                    {hasGitHubToken ? 'Change GitHub token' : 'Set GitHub token'}
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -135,7 +136,6 @@ export function BoardToolbar({
             <p className="github-status-message">{githubStatusMessage}</p>
           </div>
         ) : null}
-        </div>
       </section>
     </>
   );
